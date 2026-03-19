@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: civicvoice-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: pnpm install && pnpm run build && npx prisma migrate deploy
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: civicvoice-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+databases:
+  - name: civicvoice-db
+    databaseName: civicvoice
+    user: civicvoice
+    region: oregon
+    plan: free

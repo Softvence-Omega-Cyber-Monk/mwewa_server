@@ -2,28 +2,27 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# CivicVoice API
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+A daily civic polling platform backend built with **NestJS**, **Prisma**, and **PostgreSQL**. One poll is active at a time—citizens vote anonymously, and admins manage the full poll lifecycle.
 
-## Description
+## Key Features
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- 🗳️ **Anonymous Voting** - No sign-up required, voter privacy protected via SHA-256 hashing
+- 👨‍💼 **Admin Dashboard** - Full control over poll lifecycle (DRAFT → ACTIVE → CLOSED)
+- 🔐 **JWT Authentication** - Secure admin endpoints with Bearer tokens
+- 🤖 **Auto-Close Polls** - Cron job automatically closes polls past their `closesAt` time
+- 📊 **Real-time Results** - Public API to fetch poll results and vote counts
+- 📖 **Swagger UI** - Full API documentation with interactive testing at `/api/docs`
+- 🔄 **Type-Safe Database** - Prisma ORM with migrations and seeding
+
+## Quick Links
+
+- 📘 **[Deployment Guide](./RENDER_DEPLOYMENT.md)** - Deploy to Render with one click
+- 🚀 **[API Documentation](http://localhost:3000/api/docs)** - Interactive Swagger docs
+- 📦 **[Prisma Schema](./prisma/schema/schema.prisma)** - Database models
+
+
 
 ## Project setup
 
@@ -59,16 +58,28 @@ $ pnpm run test:cov
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Deploy to Render (Recommended)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+This project is optimized for deployment on [Render](https://render.com/), a modern cloud platform.
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+**Quick Start:**
+1. Push your code to GitHub
+2. Connect your repository to Render
+3. Render will automatically detect `render.yaml` and configure everything
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+For detailed instructions, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md).
+
+**Environment Variables Required:**
+- `DATABASE_URL` - PostgreSQL connection string (auto-linked via render.yaml)
+- `JWT_SECRET` - Generate with: `openssl rand -base64 32`
+- `ALLOWED_ORIGINS` - Comma-separated list of frontend URLs
+- `NODE_ENV` - Set to `production`
+
+Other cloud options:
+- [NestJS Deployment Guide](https://docs.nestjs.com/deployment)
+- [Vercel](https://vercel.com/) (for edge functions)
+- [AWS](https://aws.amazon.com/)
+- [Heroku](https://www.heroku.com/) (if still in production)
 
 ## Resources
 
