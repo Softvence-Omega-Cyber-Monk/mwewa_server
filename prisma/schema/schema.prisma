@@ -1,0 +1,79 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("admins")
+}
+
+// ─── Poll ─────────────────────────────────────────────────────────────────────
+
+enum PollStatus {
+  DRAFT       // Saved but not yet published
+  ACTIVE      // Currently accepting votes
+  CLOSED      // Voting ended; results visible
+}
+
+model Poll {
+  id          String     @id @default(cuid())
+  title       String                        // Internal admin title (e.g. "Renewable Energy Investment")
+  question    String                        // Public-facing question text
+  status      PollStatus @default(DRAFT)
+  publishedAt DateTime?                     // When the poll went ACTIVE
+  closesAt    DateTime?                     // When cron will flip status → CLOSED
+  nextPollAt  DateTime?                     // Scheduled start of the next poll (informational)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  options     PollOption[]
+  votes       Vote[]
+
+  @@map("polls")
+}
+
+// ─── PollOption ───────────────────────────────────────────────────────────────
+
+model PollOption {
+  id        String   @id @default(cuid())
+  pollId    String
+  label     String                          // e.g. "Yes", "No", "Not Sure"
+  order     Int      @default(0)            // Display order
+  createdAt DateTime @default(now())
+
+  poll  Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes Vote[]
+
+  @@map("poll_options")
+}
+
+// ─── Vote ─────────────────────────────────────────────────────────────────────
+
+model Vote {
+  id         String   @id @default(cuid())
+  pollId     String
+  optionId   String
+  voterToken String                         // SHA-256( ip + userAgent + pollId ) — anonymous but de-dupable
+  createdAt  DateTime @default(now())
+
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  // One voter token may only vote once per poll
+  @@unique([pollId, voterToken])
+  @@map("votes")
+}
