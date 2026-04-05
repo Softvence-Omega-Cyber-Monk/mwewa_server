@@ -4,6 +4,11 @@ import { ApiBody, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/
 import { VotesService } from './votes.service';
 import { CastVoteDto } from './dto/cast-vote.dto';
 import { AlreadyVotedResponseDto, VoteResponseDto } from './dto/vote-response.dto';
+import {
+  PostVoteStepResponseDto,
+  SubmitDemographicsDto,
+  SubmitQuestionSuggestionDto,
+} from './dto/post-vote.dto';
 
 @ApiTags('Public – Voting')
 @Controller('votes')
@@ -85,5 +90,67 @@ Both cases return HTTP **200** so the client can always render results after thi
     @Headers('user-agent') userAgent: string,
   ) {
     return this.votesService.castVote(dto.optionId, ip ?? 'unknown', userAgent ?? 'unknown');
+  }
+
+  // ─── POST /votes/post-vote/demographics ─────────────────────────────────────
+  @Post('post-vote/demographics')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Step 1: Submit optional anonymous demographics after voting',
+    description:
+      'Saves anonymous demographic details for the current active poll. ' +
+      'Data is linked to an anonymized voter token and can be updated if re-submitted.',
+  })
+  @ApiHeader({
+    name: 'user-agent',
+    description: 'Browser / client User-Agent string (used for anonymous de-duplication)',
+    required: false,
+  })
+  @ApiBody({ type: SubmitDemographicsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Demographic data saved successfully.',
+    type: PostVoteStepResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'No active poll found.' })
+  submitDemographics(
+    @Body() dto: SubmitDemographicsDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.votesService.submitDemographics(ip ?? 'unknown', userAgent ?? 'unknown', dto);
+  }
+
+  // ─── POST /votes/post-vote/question-suggestion ──────────────────────────────
+  @Post('post-vote/question-suggestion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Step 2: Submit optional question suggestion after voting',
+    description:
+      'Stores an optional voter suggestion (max 200 chars) for a future poll question. ' +
+      'If empty or omitted, the step is marked as skipped.',
+  })
+  @ApiHeader({
+    name: 'user-agent',
+    description: 'Browser / client User-Agent string (used for anonymous de-duplication)',
+    required: false,
+  })
+  @ApiBody({ type: SubmitQuestionSuggestionDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Suggestion saved (or optional step skipped).',
+    type: PostVoteStepResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'No active poll found.' })
+  submitQuestionSuggestion(
+    @Body() dto: SubmitQuestionSuggestionDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.votesService.submitQuestionSuggestion(
+      ip ?? 'unknown',
+      userAgent ?? 'unknown',
+      dto.questionSuggestion,
+    );
   }
 }

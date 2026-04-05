@@ -10,6 +10,7 @@ import { CreatePollDto } from './dto/create-poll.dto';
 import { UpdatePollDto } from './dto/update-poll.dto';
 import { PollHistoryQueryDto } from './dto/poll-history-query.dto';
 import { PollStatus } from '@prisma/client';
+import { UserQuestionSuggestionsQueryDto } from './dto/user-data.dto';
 
 @Injectable()
 export class PollsService {
@@ -35,6 +36,19 @@ export class PollsService {
     });
 
     return { ...poll, totalVotes, options };
+  }
+
+  private toPercentage(count: number, total: number) {
+    if (total === 0) return 0;
+    return Math.round((count / total) * 1000) / 10;
+  }
+
+  private async ensurePollExists(pollId: string) {
+    const poll = await this.prisma.poll.findUnique({
+      where: { id: pollId },
+      select: { id: true },
+    });
+    if (!poll) throw new NotFoundException('Poll not found');
   }
 
   // ─── Public ──────────────────────────────────────────────────────────────────
@@ -368,6 +382,148 @@ export class PollsService {
       totalPolls: totalPollsCount,
       activePoll: activePollData,
     };
+  }
+
+  async getPollDemographics(pollId: string) {
+    await this.ensurePollExists(pollId);
+
+    const [totalResponses, provinceGroups, ageGroups, genderGroups] = await Promise.all([
+      this.prisma.postVoteInsight.count({ where: { pollId } }),
+      this.prisma.postVoteInsight.groupBy({
+        by: ['province'],
+        where: { pollId, province: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { province: 'desc' } },
+      }),
+      this.prisma.postVoteInsight.groupBy({
+        by: ['ageGroup'],
+        where: { pollId, ageGroup: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { ageGroup: 'desc' } },
+      }),
+      this.prisma.postVoteInsight.groupBy({
+        by: ['gender'],
+        where: { pollId, gender: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { gender: 'desc' } },
+      }),
+    ]);
+
+    const totalWithProvince = provinceGroups.reduce((sum, item) => sum + item._count._all, 0);
+    const totalWithAgeGroup = ageGroups.reduce((sum, item) => sum + item._count._all, 0);
+    const totalWithGender = genderGroups.reduce((sum, item) => sum + item._count._all, 0);
+
+    return {
+      totals: {
+        totalResponses,
+        totalWithProvince,
+        totalWithAgeGroup,
+        totalWithGender,
+      },
+      provinceDistribution: provinceGroups.map((item) => ({
+        province: item.province!,
+        count: item._count._all,
+        percentage: this.toPercentage(item._count._all, totalWithProvince),
+      })),
+      ageDistribution: ageGroups.map((item) => ({
+        ageGroup: item.ageGroup!,
+        count: item._count._all,
+        percentage: this.toPercentage(item._count._all, totalWithAgeGroup),
+      })),
+      genderDistribution: genderGroups.map((item) => ({
+        gender: item.gender!,
+        count: item._count._all,
+        percentage: this.toPercentage(item._count._all, totalWithGender),
+      })),
+    };
+  }
+
+  async getPollQuestionSuggestions(pollId: string, query: UserQuestionSuggestionsQueryDto) {
+    await this.ensurePollExists(pollId);
+
+    const { page = 1, limit = 10, search } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      pollId,
+      questionSuggestion: { not: null },
+    };
+
+    if (search) {
+      where.questionSuggestion = {
+        not: null,
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
+
+    const [total, suggestions] = await Promise.all([
+      this.prisma.postVoteInsight.count({ where }),
+      this.prisma.postVoteInsight.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          questionSuggestion: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      data: suggestions.map((s) => ({
+        id: s.id,
+        questionSuggestion: s.questionSuggestion!,
+        createdAt: s.createdAt,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async exportPollQuestionSuggestions(pollId: string, search?: string) {
+    await this.ensurePollExists(pollId);
+
+    const where: any = {
+      pollId,
+      questionSuggestion: { not: null },
+    };
+
+    if (search) {
+      where.questionSuggestion = {
+        not: null,
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
+
+    const suggestions = await this.prisma.postVoteInsight.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        questionSuggestion: true,
+        createdAt: true,
+      },
+    });
+
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const header = 'id,questionSuggestion,createdAt';
+    const lines = suggestions.map((row) =>
+      [
+        escapeCsv(row.id),
+        escapeCsv(row.questionSuggestion ?? ''),
+        escapeCsv(row.createdAt.toISOString()),
+      ].join(','),
+    );
+
+    return [header, ...lines].join('\n');
   }
 
   // ─── Cron helper (called by scheduler) ──────────────────────────────────────

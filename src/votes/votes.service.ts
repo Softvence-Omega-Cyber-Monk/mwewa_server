@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { PollStatus } from '@prisma/client';
+import { AgeGroup, Gender, PollStatus, Province } from '@prisma/client';
 
 @Injectable()
 export class VotesService {
@@ -130,6 +130,83 @@ export class VotesService {
       optionId,
       optionLabel: option.label,
       ...results,
+    };
+  }
+
+  private async getActivePollForPostVoteFlow() {
+    const poll = await this.prisma.poll.findFirst({
+      where: { status: PollStatus.ACTIVE },
+      orderBy: { publishedAt: 'desc' },
+    });
+    if (!poll) {
+      throw new NotFoundException(
+        'No active poll found. Post-vote data can only be submitted for an active poll.',
+      );
+    }
+    return poll;
+  }
+
+  async submitDemographics(
+    ip: string,
+    userAgent: string,
+    payload: {
+      province: Province;
+      ageGroup: AgeGroup;
+      gender?: Gender;
+    },
+  ) {
+    const poll = await this.getActivePollForPostVoteFlow();
+    const voterToken = this.buildVoterToken(poll.id, ip, userAgent);
+
+    await this.prisma.postVoteInsight.upsert({
+      where: { pollId_voterToken: { pollId: poll.id, voterToken } },
+      create: {
+        pollId: poll.id,
+        voterToken,
+        province: payload.province,
+        ageGroup: payload.ageGroup,
+        gender: payload.gender ?? null,
+      },
+      update: {
+        province: payload.province,
+        ageGroup: payload.ageGroup,
+        gender: payload.gender ?? null,
+      },
+    });
+
+    return {
+      message: 'Demographic data saved successfully.',
+      skipped: false,
+    };
+  }
+
+  async submitQuestionSuggestion(ip: string, userAgent: string, questionSuggestion?: string) {
+    const poll = await this.getActivePollForPostVoteFlow();
+    const voterToken = this.buildVoterToken(poll.id, ip, userAgent);
+    const trimmedSuggestion = questionSuggestion?.trim();
+
+    if (!trimmedSuggestion) {
+      return {
+        message: 'Question suggestion step skipped.',
+        skipped: true,
+      };
+    }
+
+    await this.prisma.postVoteInsight.upsert({
+      where: { pollId_voterToken: { pollId: poll.id, voterToken } },
+      create: {
+        pollId: poll.id,
+        voterToken,
+        questionSuggestion: trimmedSuggestion,
+      },
+      update: {
+        questionSuggestion: trimmedSuggestion,
+      },
+    });
+
+    return {
+      message: 'Question suggestion saved successfully.',
+      skipped: false,
     };
   }
 

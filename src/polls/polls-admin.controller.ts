@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,7 +32,13 @@ import {
   PollDto,
   PollHistoryResponseDto,
 } from './dto/poll-response.dto';
+import {
+  PollDemographicsResponseDto,
+  QuestionSuggestionsResponseDto,
+  UserQuestionSuggestionsQueryDto,
+} from './dto/user-data.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Response } from 'express';
 
 @ApiTags('Admin – Polls')
 @ApiBearerAuth('JWT')
@@ -152,6 +159,82 @@ export class PollsAdminController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   getPollById(@Param('id') id: string) {
     return this.pollsService.getPollById(id);
+  }
+
+  // ─── GET /admin/polls/:id/user-data/demographics ────────────────────────────
+  @Get(':id/user-data/demographics')
+  @ApiOperation({
+    summary: 'Get demographic distributions for a poll',
+    description:
+      'Returns province (bar-chart ready), age group (pie-chart ready), and gender ' +
+      '(pie-chart ready) distributions based on anonymous post-vote user data.',
+  })
+  @ApiParam({ name: 'id', description: 'Poll ID', example: 'clpoll456abc' })
+  @ApiResponse({
+    status: 200,
+    description: 'Demographic distributions returned successfully.',
+    type: PollDemographicsResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Poll not found.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  getPollDemographics(@Param('id') id: string) {
+    return this.pollsService.getPollDemographics(id);
+  }
+
+  // ─── GET /admin/polls/:id/user-data/question-suggestions ────────────────────
+  @Get(':id/user-data/question-suggestions')
+  @ApiOperation({
+    summary: 'Get paginated user question suggestions',
+    description:
+      'Returns a searchable and paginated list of user-submitted question suggestions ' +
+      'for the specified poll.',
+  })
+  @ApiParam({ name: 'id', description: 'Poll ID', example: 'clpoll456abc' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Items per page (default 10, max 100)' })
+  @ApiQuery({ name: 'search', required: false, example: 'education', description: 'Search term in suggestion text' })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated question suggestions returned.',
+    type: QuestionSuggestionsResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Poll not found.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  getPollQuestionSuggestions(
+    @Param('id') id: string,
+    @Query() query: UserQuestionSuggestionsQueryDto,
+  ) {
+    return this.pollsService.getPollQuestionSuggestions(id, query);
+  }
+
+  // ─── GET /admin/polls/:id/user-data/question-suggestions/export ─────────────
+  @Get(':id/user-data/question-suggestions/export')
+  @ApiOperation({
+    summary: 'Export user question suggestions as CSV',
+    description:
+      'Exports all question suggestions for a poll as CSV. ' +
+      'Supports optional search filtering before export.',
+  })
+  @ApiParam({ name: 'id', description: 'Poll ID', example: 'clpoll456abc' })
+  @ApiQuery({ name: 'search', required: false, example: 'healthcare', description: 'Optional text filter applied before export' })
+  @ApiResponse({
+    status: 200,
+    description: 'CSV export generated successfully.',
+  })
+  @ApiResponse({ status: 404, description: 'Poll not found.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  async exportPollQuestionSuggestions(
+    @Param('id') id: string,
+    @Query('search') search: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const csv = await this.pollsService.exportPollQuestionSuggestions(id, search);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="poll-${id}-question-suggestions.csv"`,
+    );
+    return csv;
   }
 
   // ─── POST /admin/polls ────────────────────────────────────────────────────────

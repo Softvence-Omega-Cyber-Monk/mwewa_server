@@ -29,6 +29,34 @@ enum PollStatus {
   CLOSED      // Voting ended; results visible
 }
 
+enum Province {
+  CENTRAL
+  COPPERBELT
+  EASTERN
+  LUAPULA
+  LUSAKA
+  MUCHINGA
+  NORTHERN
+  NORTH_WESTERN
+  SOUTHERN
+  WESTERN
+}
+
+enum AgeGroup {
+  AGE_18_24
+  AGE_25_34
+  AGE_35_44
+  AGE_45_54
+  AGE_55_PLUS
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
 model Poll {
   id          String     @id @default(cuid())
   title       String                        // Internal admin title (e.g. "Renewable Energy Investment")
@@ -42,6 +70,7 @@ model Poll {
 
   options     PollOption[]
   votes       Vote[]
+  insights    PostVoteInsight[]
 
   @@map("polls")
 }
@@ -76,4 +105,25 @@ model Vote {
   // One voter token may only vote once per poll
   @@unique([pollId, voterToken])
   @@map("votes")
+}
+
+// ─── Post-vote user data (anonymous) ─────────────────────────────────────────
+
+model PostVoteInsight {
+  id                 String    @id @default(cuid())
+  pollId             String
+  voterToken         String
+  province           Province?
+  ageGroup           AgeGroup?
+  gender             Gender?
+  questionSuggestion String?   @db.VarChar(200)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, voterToken])
+  @@index([pollId])
+  @@index([createdAt])
+  @@map("post_vote_insights")
 }
